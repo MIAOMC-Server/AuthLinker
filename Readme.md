@@ -45,10 +45,6 @@ AuthLinker 是一个用于生成带鉴权功能的链接的 Java 插件。通过
 
 ## 反混淆
 
-<<<<<<< Updated upstream
-[反混淆案例 - typescript](https://github.com/MIAOMC-Server/AuthLinker/blob/main/src/main/resources/TypeScript%20%E5%8F%8D%E6%B7%B7%E6%B7%86%E7%A4%BA%E4%BE%8B.ts)
-用法 deobfuscate(data) 直接输入混淆后的内容就好，这样就可以获取json和base64明文了。
-=======
 [反混淆案例 - typescript](https://github.com/MIAOMC-Server/AuthLinker/blob/main/src/main/resources/TypeScript%20%E5%8F%8D%E6%B7%B7%E6%B7%86%E7%A4%BA%E4%BE%8B.ts) 用法：
   
 导入ts文件，然后使用 deobfuscate(data) 直接输入混淆后的内容就好，这样就可以获取json和base64明文了。
@@ -82,7 +78,6 @@ Maven 或 Gradle 构建工具
 MySQL 数据库（或其他支持的数据库）
 
 Minecraft 1.17 或更高版本（如果作为插件使用）
->>>>>>> Stashed changes
 
 ## 配置示例
 
