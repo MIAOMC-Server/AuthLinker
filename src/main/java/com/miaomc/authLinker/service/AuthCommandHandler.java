@@ -93,7 +93,9 @@ public class AuthCommandHandler implements CommandExecutor, TabCompleter {
             link = "http://" + link;
         }
 
-        plugin.getLogger().info("生成的验证链接: " + link); // 添加日志以便调试
+        if (plugin.getConfig().getString("settings.console_logging", "true").equalsIgnoreCase("true")) {
+            plugin.getLogger().info("玩家 " + player.getName() + " 已生成 " + action + " 验证链接: " + link);
+        }
 
         Component message = Component.text(prefix + "已生成" + action + "验证链接：", NamedTextColor.GREEN)
                 .append(Component.newline())

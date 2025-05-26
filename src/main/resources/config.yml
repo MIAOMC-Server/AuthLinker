@@ -15,5 +15,7 @@ settings:
   cooldown: 120 # 秒，冷却时间
   timeout: 3000 # 毫秒，超时时间
   base64_shift: 3  # Base64位移位数
-  base64_obfuscation_table: "jQNHxo9a1zVG8dFcyb27XmiwOl0WULnkPsBKqEAZYfer3t5RMDSCJhgvu4pT-." # Base64混淆表
+  base64_obfuscation_table: "jQNHxo9a1zVG8dFcyb27XmiwOl0WULnkPsBKqEAZYfer3t5RMDSCJhgvu4pT-." # 混淆表，不可以出现空格和特殊字符
   rotation_timestamp: 86400 # 时间戳旋转间隔，单位为秒
+  console_logging: false # 是否在控制台输出提示信息，true 输出信息
+
