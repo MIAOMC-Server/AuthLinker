@@ -6,7 +6,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 
 /**
  * Base64混淆工具类，用于对Base64编码的字符串进行混淆处理
@@ -223,7 +222,7 @@ public class Base64Obfuscator {
     public String offsetBase64Table(long timestamp) {
         long seed = timestamp / (rotationTimestamp * 1000L); // 计算经过的旋转周期数（天数）
         char[] tableArr = obfuscationTable.toCharArray();
-        Random random = new Random(seed);
+        SeededRandom random = new SeededRandom(seed);
 
         // Fisher-Yates 洗牌
         for (int i = tableArr.length - 1; i > 0; i--) {

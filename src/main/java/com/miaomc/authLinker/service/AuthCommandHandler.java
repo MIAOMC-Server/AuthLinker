@@ -97,6 +97,8 @@ public class AuthCommandHandler implements CommandExecutor, TabCompleter {
 
         Component message = Component.text(prefix + "已生成" + action + "验证链接：", NamedTextColor.GREEN)
                 .append(Component.newline())
+                .append(Component.text("请不要在直播时点击链接，以免鉴权链接被他人盗用！", NamedTextColor.YELLOW))
+                .append(Component.newline())
                 .append(Component.text("点击打开链接", NamedTextColor.AQUA, TextDecoration.UNDERLINED)
                         .clickEvent(ClickEvent.openUrl(link)));
 
