@@ -1,0 +1,19 @@
+database:
+  host: localhost # 数据库主机地址
+  port: 3306 # 数据库端口
+  name: authlinker # 数据库名称
+  username: root # 数据库用户名
+  password: your_password # 数据库密码
+  tableName: authlinker # 创建的数据表的名称
+
+settings:
+  prefix: §f[§aAuth§6Linker§f] §r # 消息前缀
+  endpoint: "https://example.com/verify?data={data}&hash={hash}"
+  expired_time: 300  # 秒
+  token_length: 12 # 随机Token生成长度
+  salt: "abc123"  # 用于加密hash时增加安全性
+  cooldown: 120 # 秒，冷却时间
+  timeout: 3000 # 毫秒，超时时间
+  base64_shift: 3  # Base64位移位数
+  base64_obfuscation_table: "jQNHxo9a1zVG8dFcyb27XmiwOl0WULnkPsBKqEAZYfer3t5RMDSCJhgvu4pT-." # Base64混淆表
+  rotation_timestamp: 86400 # 时间戳旋转间隔，单位为秒
