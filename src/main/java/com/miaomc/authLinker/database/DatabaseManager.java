@@ -22,12 +22,12 @@ public class DatabaseManager {
 
         HikariConfig hikariConfig = new HikariConfig();
         hikariConfig.setJdbcUrl("jdbc:mysql://" +
-                config.getString("mysql.host") + ":" +
-                config.getInt("mysql.port") + "/" +
-                config.getString("mysql.database") +
+                config.getString("database.host") + ":" +
+                config.getInt("database.port") + "/" +
+                config.getString("database.name") +
                 "?useSSL=false&useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC");
-        hikariConfig.setUsername(config.getString("mysql.username"));
-        hikariConfig.setPassword(config.getString("mysql.password"));
+        hikariConfig.setUsername(config.getString("database.username"));
+        hikariConfig.setPassword(config.getString("database.password"));
         hikariConfig.setDriverClassName("com.mysql.cj.jdbc.Driver");
 
         // 基本连接池设置

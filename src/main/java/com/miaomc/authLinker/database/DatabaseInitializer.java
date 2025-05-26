@@ -18,7 +18,7 @@ public class DatabaseInitializer {
         this.plugin = plugin;
         this.databaseManager = databaseManager;
         FileConfiguration config = plugin.getConfig();
-        this.tableName = config.getString("mysql.tableName");
+        this.tableName = config.getString("database.tableName");
     }
 
     public void initializeDatabase() {
