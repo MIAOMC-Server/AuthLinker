@@ -20,7 +20,7 @@ public class AuthRecordManager {
         this.plugin = plugin;
         this.databaseManager = databaseManager;
         FileConfiguration config = plugin.getConfig();
-        this.tableName = config.getString("mysql.tableName");
+        this.tableName = config.getString("database.tableName");
         this.expiredTime = config.getInt("settings.expired_time");
         this.cooldownTime = config.getInt("settings.cooldown");
     }
