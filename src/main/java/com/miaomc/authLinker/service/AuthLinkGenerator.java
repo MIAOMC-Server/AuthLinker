@@ -129,10 +129,9 @@ public class AuthLinkGenerator {
         // 扩展JSON数据，包含更多信息
 
         String actionData = "{" +
-                "\"hash_uuid\":\"" + recordUUID + "\"," +
+                "\"uuid\":\"" + recordUUID + "\"," +
                 "\"action\":\"" + action + "\"," +
                 "\"player_uuid\":\"" + playerUUID.toString() + "\"," +
-                "\"timestamp\":" + currentTimeMillis + "," +
                 "\"expires_time\":" + expiresTime + // 添加过期时间戳
                 "}";
 
