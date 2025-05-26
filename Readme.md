@@ -26,7 +26,7 @@ AuthLinker 是一个用于生成带鉴权功能的链接的 Java 插件。通过
 
 3. **生成鉴权链接**
 
-   通过调用接口或命令生成鉴权链接，链接格式如：https://example.com/verify?data={data}&token={token}
+   通过调用接口或命令生成鉴权链接，链接格式如：https://example.com/verify?data={data}&hash={hash}
 4. 其中 `data` 为混淆后的 Base64 数据，`token` 为随机生成的 Token。
 
 4. **校验流程**
