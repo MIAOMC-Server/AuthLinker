@@ -43,6 +43,11 @@ AuthLinker 是一个用于生成带鉴权功能的链接的 Java 插件。通过
 - **防重放**：Token 支持时效性和一次性使用，防止链接被重复利用
 - **配置安全**：请妥善保管数据库和 salt 等敏感信息
 
+## 反混淆
+
+[反混淆案例 - typescript](https://github.com/MIAOMC-Server/AuthLinker/blob/main/src/main/resources/TypeScript%20%E5%8F%8D%E6%B7%B7%E6%B7%86%E7%A4%BA%E4%BE%8B.ts)
+用法 deobfuscate(data) 直接输入混淆后的内容就好，这样就可以获取json和base64明文了。
+
 ## 配置示例
 
 详见 `src/main/resources/config.yml`：
