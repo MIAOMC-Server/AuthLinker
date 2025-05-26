@@ -1,3 +1,4 @@
+// @ts-ignore
 import { Buffer } from 'buffer';
 
 const STANDARD_BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
