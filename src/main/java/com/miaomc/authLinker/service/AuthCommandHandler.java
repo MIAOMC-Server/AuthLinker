@@ -88,6 +88,13 @@ public class AuthCommandHandler implements CommandExecutor, TabCompleter {
     }
 
     private void sendClickableLink(Player player, String link, String action) {
+        // 确保链接以http://或https://开头
+        if (!link.toLowerCase().startsWith("http://") && !link.toLowerCase().startsWith("https://")) {
+            link = "http://" + link;
+        }
+
+        plugin.getLogger().info("生成的验证链接: " + link); // 添加日志以便调试
+
         Component message = Component.text(prefix + "已生成" + action + "验证链接：", NamedTextColor.GREEN)
                 .append(Component.newline())
                 .append(Component.text("点击打开链接", NamedTextColor.AQUA, TextDecoration.UNDERLINED)

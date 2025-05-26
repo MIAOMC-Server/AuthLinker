@@ -93,10 +93,10 @@ public class AuthLinkGenerator {
                                     result.setHash(hash);
                                     result.setRecordUUID(recordUUID);
 
-                                    // 替换链接中的变量，取消对{token}的替换
+                                    // 替换链接中的所有变量，包括token
                                     String link = endpoint.replace("{data}", encodedAction)
-                                            .replace("{hash}", hash);
-                                    // 不再替换{token}，保留在URL中作为变量
+                                            .replace("{hash}", hash)
+                                            .replace("{token}", token);
                                     result.setLink(link);
                                 } else {
                                     result.setErrorMessage("生成链接时出错: 数据库写入失败");

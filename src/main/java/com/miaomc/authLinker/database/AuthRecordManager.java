@@ -114,7 +114,7 @@ public class AuthRecordManager {
             String sql = "SELECT uuid FROM " + tableName +
                     " WHERE player_uuid = ? AND action = ? AND " +
                     "UNIX_TIMESTAMP(expires_at) > ? AND " +
-                    "(is_used IS NULL)";
+                    "is_used IS NULL";
 
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 statement.setString(1, playerUUID.toString());
@@ -162,7 +162,7 @@ public class AuthRecordManager {
     private void writeAuthRecord(String uuid, String playerUUID, String action, String token) throws SQLException {
         try (Connection connection = databaseManager.getConnection()) {
             String sql = "INSERT INTO " + tableName +
-                    " (uuid, player_uuid, action, token, expires_at) VALUES (?, ?, ?, ?, ?)";
+                    " (uuid, player_uuid, action, token, expires_at) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? SECOND))";
 
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 statement.setString(1, uuid);
@@ -170,9 +170,8 @@ public class AuthRecordManager {
                 statement.setString(3, action);
                 statement.setString(4, token);
 
-                // 设置过期时间
-                Timestamp expiresAt = new Timestamp(System.currentTimeMillis() + expiredTime * 1000L);
-                statement.setTimestamp(5, expiresAt);
+                // 使用数据库函数直接计算过期时间，避免时区问题
+                statement.setInt(5, expiredTime);
 
                 statement.executeUpdate();
             }
