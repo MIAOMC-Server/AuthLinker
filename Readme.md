@@ -51,11 +51,19 @@ AuthLinker 是一个用于生成带鉴权功能的链接的 Java 插件。通过
 ```ts
 import { deobfuscate } from './deobfuscate'; // 假设文件名为 deobfuscate.ts
 
+interface Option {
+    shift?: number,
+    obfuscationTable?: string,
+    rotationTimestamp?: number,
+    decodeBase64?: boolean
+}
+
 // 反混淆配置，这里的配置需要和你在yml里配置的一致
-const options = {
+const options: Option = {
    shift: 3, // 偏移量，处理时会变为负数，你在yml里怎么配置的就怎么写;
    obfuscationTable: "jQNHxo9a1zVG8dFcyb27XmiwOl0WULnkPsBKqEAZYfer3t5RMDSCJhgvu4pT-.", // 你定义的混淆表;
-   rotationTimestamp: 86400 // 时间戳旋转间隔，单位为秒;
+   rotationTimestamp: 86400, // 时间戳旋转间隔，单位为秒;
+   decodeBase64: true // 如果为false会返回明文json的base64格式内容，如果为true，直接返回明文json
 }
 
 const rawData = "eyJkYXRhIjoidHVhaG4wcTFWYnNyLmNFQkVicHVOY09SZFNGVEZyX18uYlY0WDBhVS5KQ1IuNUNfRTRnMS5TZ0JkYmFxVnJHckYwRV9IMEFNVmJzclFTQTNIMFpyWHlhR1FTazhkV2FqbldnZWR5VktWYkRyTkpucmRKYWJYY25xTmNGUkVKVXIucmhVRTBhclhjLmhOMHZaRmJWdUZCQ3UueVZ3VkJnWk9TcXVkV0VqblNxUmQyVksuY09fTkpWVEVjT18uNHBoRVdfXyIsInRpbWUiOjE3NDgyNzU0NDM0NTZ9"
