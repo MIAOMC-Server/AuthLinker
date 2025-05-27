@@ -78,8 +78,9 @@ public class AuthLinkGenerator {
                     String recordUUID = UUID.randomUUID().toString();
                     // 不在冷却中，生成新链接
                     String token = generateToken();
+                    String plainBase64 = encodeAction(action, recordUUID, playerUUID, false); // 未混淆的Base64编码
                     String encodedAction = encodeAction(action, recordUUID, playerUUID); // 传入玩家UUID
-                    String hash = generateHash(encodedAction, token);
+                    String hash = generateHash(plainBase64, token);
 
                     // 写入数据库
                     return authRecordManager.writeAuthRecordAsync(playerUUID, action, token, recordUUID)
@@ -115,32 +116,40 @@ public class AuthLinkGenerator {
     }
 
     /**
-     * 将操作转换为JSON，然后Base64编码并混淆处理
+     * 将操作转换为JSON，然后Base64编码并可选择是否混淆处理
      *
      * @param action     操作类型
      * @param recordUUID 记录的UUID
      * @param playerUUID 玩家UUID
-     * @return 混淆处理后的Base64字符串
+     * @param obfuscate  是否混淆数据，默认为false
+     * @return 处理后的字符串
      */
-    private String encodeAction(String action, String recordUUID, UUID playerUUID) {
+    private String encodeAction(String action, String recordUUID, UUID playerUUID, Boolean obfuscate) {
         long currentTimeMillis = System.currentTimeMillis();
         long expiresTime = currentTimeMillis + (expiredTime * 1000L); // 计算过期时间的时间戳
 
-        // 扩展JSON数据，包含更多信息
-
+        // 按照指定顺序构建JSON数据：recordUUID, action, player_uuid, expires_time
         String actionData = "{" +
-                "\"uuid\":\"" + recordUUID + "\"," +
+                "\"recordUUID\":\"" + recordUUID + "\"," +
                 "\"action\":\"" + action + "\"," +
                 "\"player_uuid\":\"" + playerUUID.toString() + "\"," +
-                "\"expires_time\":" + expiresTime + // 添加过期时间戳
+                "\"expires_time\":" + expiresTime +
                 "}";
 
-        // 检查Base64Obfuscator是否可用，如果可用则使用混淆，否则使用标准Base64编码
-        if (base64Obfuscator != null) {
+        // 首先获取标准Base64编码（用于哈希计算）
+        String standardBase64 = java.util.Base64.getEncoder().encodeToString(actionData.getBytes(StandardCharsets.UTF_8));
+
+        // 根据参数决定是否进行混淆
+        if (obfuscate != null && obfuscate && base64Obfuscator != null) {
             return base64Obfuscator.obfuscate(actionData);
         } else {
-            return java.util.Base64.getEncoder().encodeToString(actionData.getBytes(StandardCharsets.UTF_8));
+            return standardBase64;
         }
+    }
+
+    // 重载方法，默认不混淆
+    private String encodeAction(String action, String recordUUID, UUID playerUUID) {
+        return encodeAction(action, recordUUID, playerUUID, false);
     }
 
     /**
