@@ -140,7 +140,7 @@ public class AuthRecordManager {
     private void markRecordAsCovered(String uuid) throws SQLException {
         try (Connection connection = databaseManager.getConnection()) {
             String sql = "UPDATE " + tableName +
-                    " SET is_used = TRUE, status = 'covered', expires_at = CURRENT_TIMESTAMP " +
+                    " SET is_used = TRUE, status = 'covered', expires_at = CURRENT_TIMESTAMP , update_at = CURRENT_TIMESTAMP" +
                     "WHERE uuid = ?";
 
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
