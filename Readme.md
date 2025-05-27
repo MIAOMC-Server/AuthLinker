@@ -45,37 +45,7 @@ AuthLinker 是一个用于生成带鉴权功能的链接的 Java 插件。通过
 
 ## 反混淆
 
-[反混淆案例 - typescript](https://github.com/MIAOMC-Server/AuthLinker/blob/main/TypeScript%20%E5%8F%8D%E6%B7%B7%E6%B7%86%E7%A4%BA%E4%BE%8B.ts) 用法：
-  
-导入ts文件，然后使用 deobfuscate(data) 直接输入混淆后的内容就好，这样就可以获取json和base64明文了。
-```ts
-import { deobfuscate } from './deobfuscate'; // 假设文件名为 deobfuscate.ts
-
-interface Option {
-    shift?: number,
-    obfuscationTable?: string,
-    rotationTimestamp?: number,
-    decodeBase64?: boolean
-}
-
-// 反混淆配置，这里的配置需要和你在yml里配置的一致
-const options: Option = {
-   shift: 3, // 偏移量，处理时会变为负数，你在yml里怎么配置的就怎么写;
-   obfuscationTable: "jQNHxo9a1zVG8dFcyb27XmiwOl0WULnkPsBKqEAZYfer3t5RMDSCJhgvu4pT-.", // 你定义的混淆表;
-   rotationTimestamp: 86400, // 时间戳旋转间隔，单位为秒;
-   decodeBase64: true // 如果为false会返回明文json的base64格式内容，如果为true，直接返回明文json
-}
-
-const rawData = "eyJkYXRhIjoidHVhaG4wcTFWYnNyLmNFQkVicHVOY09SZFNGVEZyX18uYlY0WDBhVS5KQ1IuNUNfRTRnMS5TZ0JkYmFxVnJHckYwRV9IMEFNVmJzclFTQTNIMFpyWHlhR1FTazhkV2FqbldnZWR5VktWYkRyTkpucmRKYWJYY25xTmNGUkVKVXIucmhVRTBhclhjLmhOMHZaRmJWdUZCQ3UueVZ3VkJnWk9TcXVkV0VqblNxUmQyVksuY09fTkpWVEVjT18uNHBoRVdfXyIsInRpbWUiOjE3NDgyNzU0NDM0NTZ9"
-const data = deobfuscate(rawData, options); //这里的 options 可以忽略，但是前提是不修改yml配置
-
-console.log(data);
-
-/*
-输出结果：
-{"uuid":"13f64297-df7b-4223-ba01-3a475d0eff2e","action":"login","player_uuid":"4b87bd2c-7e96-48b2-a5bb-359e8b22ba20","expires_time":1748275743455}
- */
-```
+见 [TypeScript反混淆示例](https://github.com/MIAOMC-Server/AuthLinker/tree/main/examples/TypeScript)
 
 ## 依赖
 
