@@ -106,7 +106,7 @@ public class Base64Obfuscator {
         }
 
         // 创建包含混淆数据和时间戳的JSON
-        String json = String.format("{\"data\":\"%s\",\"time\":%d}", obfuscated.toString(), timestamp);
+        String json = String.format("{\"data\":\"%s\",\"time\":%d}", obfuscated, timestamp);
         
         // 对JSON进行Base64编码
         return Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));

@@ -128,9 +128,9 @@ public class AuthLinkGenerator {
         long currentTimeMillis = System.currentTimeMillis();
         long expiresTime = currentTimeMillis + (expiredTime * 1000L); // 计算过期时间的时间戳
 
-        // 按照指定顺序构建JSON数据：recordUUID, action, player_uuid, expires_time
+        // 按照指定顺序构建JSON数据：uuid, action, player_uuid, expires_time
         String actionData = "{" +
-                "\"recordUUID\":\"" + recordUUID + "\"," +
+                "\"uuid\":\"" + recordUUID + "\"," +
                 "\"action\":\"" + action + "\"," +
                 "\"player_uuid\":\"" + playerUUID.toString() + "\"," +
                 "\"expires_time\":" + expiresTime +
@@ -140,7 +140,7 @@ public class AuthLinkGenerator {
         String standardBase64 = java.util.Base64.getEncoder().encodeToString(actionData.getBytes(StandardCharsets.UTF_8));
 
         // 根据参数决定是否进行混淆
-        if (obfuscate != null && obfuscate && base64Obfuscator != null) {
+        if (obfuscate) {
             return base64Obfuscator.obfuscate(actionData);
         } else {
             return standardBase64;
@@ -149,7 +149,7 @@ public class AuthLinkGenerator {
 
     // 重载方法，默认不混淆
     private String encodeAction(String action, String recordUUID, UUID playerUUID) {
-        return encodeAction(action, recordUUID, playerUUID, false);
+        return encodeAction(action, recordUUID, playerUUID, true);
     }
 
     /**
