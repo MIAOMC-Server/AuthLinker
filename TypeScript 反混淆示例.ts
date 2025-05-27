@@ -71,7 +71,8 @@ function applyShift(input: string, shiftAmount: number) {
 export function deobfuscate(input: string, options?: {
     shift?: number,
     obfuscationTable?: string,
-    rotationTimestamp?: number
+    rotationTimestamp?: number,
+    decodeBase64?: boolean
 }): string {
     const shift = options?.shift ?? DEFAULT_SHIFT;
     const obfuscationTable = options?.obfuscationTable ?? DEFAULT_OBFUSCATION_TABLE;
@@ -91,9 +92,15 @@ export function deobfuscate(input: string, options?: {
         const replaced = reverseReplace(data, deobfuscationMap);
         // 反向位移
         const shifted = applyShift(replaced, -shift);
-        // Base64解码
-        const decoded = Buffer.from(shifted, 'base64').toString('utf-8');
-        return decoded;
+        
+        if (decodeBase64) {
+            // Base64解码
+            const decoded = Buffer.from(shifted, 'base64').toString('utf-8');
+            return decoded;
+        }
+        
+        return shifted
+        
     } catch (e) {
         // 兼容旧格式（无json包裹）
         const { deobfuscationMap } = getMappingTables(obfuscationTable);
