@@ -31,6 +31,7 @@ public class DatabaseInitializer {
                 "player_uuid VARCHAR(36) NOT NULL," +
                 "action VARCHAR(255) NOT NULL," +
                 "token VARCHAR(50) NOT NULL," +
+                "status VARCHAR(50) NOT NULL DEFAULT 'unused'," +
                 "is_used BOOLEAN DEFAULT FALSE," +
                 "create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
                 "update_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +

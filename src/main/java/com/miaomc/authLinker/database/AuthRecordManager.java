@@ -83,7 +83,7 @@ public class AuthRecordManager {
                 String sql = "SELECT uuid FROM " + tableName +
                         " WHERE player_uuid = ? AND action = ? AND " +
                         "UNIX_TIMESTAMP(create_at) > ? AND " +
-                        "(is_used IS NULL OR is_used != 'covered')";
+                        "(is_used = FALSE AND status != 'covered')";
 
                 try (PreparedStatement statement = connection.prepareStatement(sql)) {
                     statement.setString(1, playerUUID.toString());
@@ -114,7 +114,7 @@ public class AuthRecordManager {
             String sql = "SELECT uuid FROM " + tableName +
                     " WHERE player_uuid = ? AND action = ? AND " +
                     "UNIX_TIMESTAMP(expires_at) > ? AND " +
-                    "is_used IS NULL";
+                    "is_used = FALSE";
 
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 statement.setString(1, playerUUID.toString());
@@ -140,7 +140,7 @@ public class AuthRecordManager {
     private void markRecordAsCovered(String uuid) throws SQLException {
         try (Connection connection = databaseManager.getConnection()) {
             String sql = "UPDATE " + tableName +
-                    " SET is_used = 'covered', expires_at = CURRENT_TIMESTAMP " +
+                    " SET is_used = TRUE, status = 'covered', expires_at = CURRENT_TIMESTAMP " +
                     "WHERE uuid = ?";
 
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -182,11 +182,12 @@ public class AuthRecordManager {
      * 将记录标记为已使用
      *
      * @param uuid 记录UUID
+     * @param status 状态描述
      */
     public CompletableFuture<Boolean> markRecordAsUsedAsync(String uuid, String status) {
         return CompletableFuture.supplyAsync(() -> {
             try (Connection connection = databaseManager.getConnection()) {
-                String sql = "UPDATE " + tableName + " SET is_used = ? WHERE uuid = ?";
+                String sql = "UPDATE " + tableName + " SET is_used = TRUE, status = ? WHERE uuid = ?";
 
                 try (PreparedStatement statement = connection.prepareStatement(sql)) {
                     statement.setString(1, status);
