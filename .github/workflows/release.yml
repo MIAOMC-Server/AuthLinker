@@ -50,7 +50,7 @@ jobs:
             ## 📦 AuthLinker 插件 ${{ steps.get_version.outputs.VERSION }} 发布
             
             ### 📋 版本说明
-            支持Minecraft 1.21.X
+            支持Minecraft 1.17 +
             
             ### 🔧 安装方法
             1. 下载JAR文件
