@@ -1,5 +1,5 @@
 // @ts-ignore
-import { Buffer } from 'buffer';
+import {Buffer} from 'buffer';
 
 const STANDARD_BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 const DEFAULT_OBFUSCATION_TABLE = 'jQNHxo9a1zVG8dFcyb27XmiwOl0WULnkPsBKqEAZYfer3t5RMDSCJhgvu4pT-.'
@@ -26,8 +26,7 @@ function offsetBase64Table(timestamp: number, obfuscationTable = DEFAULT_OBFUSCA
         const j = random.nextInt(i + 1);
         [tableArr[i], tableArr[j]] = [tableArr[j], tableArr[i]];
     }
-    const rotated = tableArr.join('');
-    return rotated;
+    return tableArr.join('');
 }
 
 function getMappingTables(table: string) {
@@ -77,11 +76,12 @@ export function deobfuscate(input: string, options?: {
     const shift = options?.shift ?? DEFAULT_SHIFT;
     const obfuscationTable = options?.obfuscationTable ?? DEFAULT_OBFUSCATION_TABLE;
     const rotationTimestamp = options?.rotationTimestamp ?? DEFAULT_ROTATION_TIMESTAMP;
+    const decodeBase64 = options?.decodeBase64 ?? false;
     let json: string;
     try {
         json = Buffer.from(input, 'base64').toString('utf-8');
         // 解析JSON
-        const match = json.match(/\{"data":"([^"]+)","time":(\d+)\}/);
+        const match = json.match(/\{"data":"([^"]+)","time":(\d+)}/);
         if (!match) throw new Error('Not obfuscated json');
         const data = match[1];
         const timestamp = Number(match[2]);
@@ -95,8 +95,7 @@ export function deobfuscate(input: string, options?: {
         
         if (decodeBase64) {
             // Base64解码
-            const decoded = Buffer.from(shifted, 'base64').toString('utf-8');
-            return decoded;
+            return Buffer.from(shifted, 'base64').toString('utf-8');
         }
         
         return shifted
@@ -106,7 +105,7 @@ export function deobfuscate(input: string, options?: {
         const { deobfuscationMap } = getMappingTables(obfuscationTable);
         const replaced = reverseReplace(input, deobfuscationMap);
         const shifted = applyShift(replaced, -shift);
-        const decoded = Buffer.from(shifted, 'base64').toString('utf-8');
-        return decoded;
+
+        return Buffer.from(shifted, 'base64').toString('utf-8');
     }
 }
