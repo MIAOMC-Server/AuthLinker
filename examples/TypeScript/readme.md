@@ -17,11 +17,15 @@
 1. 安装依赖：
    ```bash
    npm install
+   或
+   bun install
    ```
 2. 配置数据库连接（在 `index.ts` 中修改 MySQL 配置信息）
 3. 启动服务：
    ```bash
-   npx ts-node index.ts
+   npm run start
+   或
+   bun run start
    ```
 4. 访问接口：
 
