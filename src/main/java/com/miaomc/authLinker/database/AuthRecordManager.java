@@ -13,7 +13,6 @@ public class AuthRecordManager {
     private final DatabaseManager databaseManager;
     private final DatabaseInitializer databaseInitializer;
     private final int expiredTime;
-    private final int cooldownTime;
 
     public AuthRecordManager(AuthLinker plugin, DatabaseManager databaseManager, DatabaseInitializer databaseInitializer) {
         this.plugin = plugin;
@@ -21,7 +20,7 @@ public class AuthRecordManager {
         this.databaseInitializer = databaseInitializer;
         FileConfiguration config = plugin.getConfig();
         this.expiredTime = config.getInt("settings.expired_time");
-        this.cooldownTime = config.getInt("settings.cooldown");
+        // 移除cooldownTime字段，因为现在使用CooldownManager
     }
 
     /**
@@ -72,46 +71,6 @@ public class AuthRecordManager {
                 plugin.getLogger().log(Level.SEVERE, "写入认证记录失败", e);
                 return false;
             }
-        });
-    }
-
-    /**
-     * 异步检查玩家是否在冷却期内
-     *
-     * @param playerUUID 玩家UUID
-     * @param action     操作类型
-     * @return CompletableFuture 包含是否在冷却期内
-     */
-    public CompletableFuture<Boolean> isInCooldownAsync(UUID playerUUID, String action) {
-        return CompletableFuture.supplyAsync(() -> {
-            // 修复冷却时间逻辑：查询最近一条记录的创建时间
-            String sql = "SELECT create_at FROM `" + databaseInitializer.getTableName() +
-                        "` WHERE player_uuid = ? AND action = ? ORDER BY create_at DESC LIMIT 1";
-
-            try (Connection connection = databaseManager.getConnection();
-                 PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
-
-                preparedStatement.setString(1, playerUUID.toString());
-                preparedStatement.setString(2, action);
-
-                try (ResultSet resultSet = preparedStatement.executeQuery()) {
-                    if (resultSet.next()) {
-                        Timestamp lastCreateTime = resultSet.getTimestamp("create_at");
-                        long currentTime = System.currentTimeMillis();
-                        long lastCreateTimeMillis = lastCreateTime.getTime();
-                        long timeDifference = currentTime - lastCreateTimeMillis;
-
-                        // 如果时间差小于冷却时间（毫秒），则还在冷却期内
-                        return timeDifference < (cooldownTime * 1000L);
-                    }
-                }
-
-            } catch (SQLException e) {
-                plugin.getLogger().log(Level.SEVERE, "检查冷却时间失败", e);
-            }
-
-            // 如果没有找到记录，说明没有冷却限制
-            return false;
         });
     }
 

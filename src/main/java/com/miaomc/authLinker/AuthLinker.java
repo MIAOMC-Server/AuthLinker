@@ -6,6 +6,7 @@ import com.miaomc.authLinker.database.DatabaseManager;
 import com.miaomc.authLinker.service.AuthCommandHandler;
 import com.miaomc.authLinker.service.AuthLinkGenerator;
 import com.miaomc.authLinker.utils.RSAEncryptor;
+import com.miaomc.authLinker.utils.CooldownManager;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -21,18 +22,27 @@ public final class AuthLinker extends JavaPlugin {
         // 初始化RSA加密器
         rsaEncryptor = new RSAEncryptor(this);
 
+        // 初始化冷却时间管理器
+        CooldownManager cooldownManager = new CooldownManager(getConfig());
+
         // 初始化数据库连接和表结构
         databaseManager = new DatabaseManager(this);
         DatabaseInitializer databaseInitializer = new DatabaseInitializer(this, databaseManager);
         databaseInitializer.initializeDatabase();
 
-        // 初始化记录管理器和链接生成器（传递databaseInitializer）
+        // 初始化记录管理器和链接生成器
         AuthRecordManager authRecordManager = new AuthRecordManager(this, databaseManager, databaseInitializer);
-        AuthLinkGenerator authLinkGenerator = new AuthLinkGenerator(this, authRecordManager, rsaEncryptor);
+        AuthLinkGenerator authLinkGenerator = new AuthLinkGenerator(this, authRecordManager, rsaEncryptor, cooldownManager);
 
-        // 注册命令（传递databaseInitializer以获取表名）
+        // 注册命令
         AuthCommandHandler commandHandler = new AuthCommandHandler(this, authLinkGenerator, rsaEncryptor, databaseInitializer);
         registerCommands(commandHandler);
+
+        // 启动定期清理任务（每5分钟清理一次过期的冷却记录）
+        getServer().getScheduler().runTaskTimerAsynchronously(this, () -> {
+            cooldownManager.cleanupExpiredCooldowns();
+            getLogger().info("已清理过期的冷却记录，当前缓存数量: " + cooldownManager.getCacheSize());
+        }, 6000L, 6000L); // 5分钟 = 6000 ticks
 
         getLogger().info("AuthLinker 插件已启用!");
 

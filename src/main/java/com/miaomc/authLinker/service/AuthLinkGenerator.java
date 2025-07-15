@@ -3,6 +3,7 @@ package com.miaomc.authLinker.service;
 import com.miaomc.authLinker.AuthLinker;
 import com.miaomc.authLinker.database.AuthRecordManager;
 import com.miaomc.authLinker.utils.RSAEncryptor;
+import com.miaomc.authLinker.utils.CooldownManager;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
@@ -18,10 +19,10 @@ public class AuthLinkGenerator {
     private final AuthLinker plugin;
     private final AuthRecordManager authRecordManager;
     private final RSAEncryptor rsaEncryptor;
+    private final CooldownManager cooldownManager;
     private final String salt;
     private final int tokenLength;
     private final String endpoint;
-    private final int cooldownTime;
     private final int expiredTime;
 
     /**
@@ -30,16 +31,17 @@ public class AuthLinkGenerator {
      * @param plugin            插件实例
      * @param authRecordManager 认证记录管理器
      * @param rsaEncryptor      RSA加密器
+     * @param cooldownManager   冷却时间管理器
      */
-    public AuthLinkGenerator(AuthLinker plugin, AuthRecordManager authRecordManager, RSAEncryptor rsaEncryptor) {
+    public AuthLinkGenerator(AuthLinker plugin, AuthRecordManager authRecordManager, RSAEncryptor rsaEncryptor, CooldownManager cooldownManager) {
         this.plugin = plugin;
         this.authRecordManager = authRecordManager;
         this.rsaEncryptor = rsaEncryptor;
+        this.cooldownManager = cooldownManager;
         FileConfiguration config = plugin.getConfig();
         this.salt = config.getString("settings.salt", "abc123");
         this.tokenLength = config.getInt("settings.token_length", 12);
-        this.endpoint = config.getString("settings.endpoint", "https://example.com/verify?data={data}&token={token}");
-        this.cooldownTime = config.getInt("settings.cooldown", 120);
+        this.endpoint = config.getString("settings.endpoint", "https://example.com/verify?data={data}&hash={hash}");
         this.expiredTime = config.getInt("settings.expired_time", 300);
     }
 
@@ -61,58 +63,63 @@ public class AuthLinkGenerator {
             return CompletableFuture.completedFuture(result);
         }
 
-        // 先检查冷却时间
-        return authRecordManager.isInCooldownAsync(playerUUID, action)
-                .thenCompose(isInCooldown -> {
-                    if (isInCooldown) {
-                        // 如果在冷却中，返回错误信息
-                        AuthLinkResult result = new AuthLinkResult();
-                        result.setSuccess(false);
-                        String cooldownMsg = plugin.getConfig().getString("messages.error.cooldown", "操作太频繁，请等待 {cooldown} 秒后再试");
-                        result.setErrorMessage(cooldownMsg.replace("{cooldown}", String.valueOf(cooldownTime)));
-                        return CompletableFuture.completedFuture(result);
-                    }
+        // 使用内存缓存检查冷却时间（同步操作，更快速）
+        if (cooldownManager.isInCooldown(playerUUID, action)) {
+            AuthLinkResult result = new AuthLinkResult();
+            result.setSuccess(false);
 
-                    // 先生成记录UUID
-                    String recordUUID = UUID.randomUUID().toString();
-                    // 不在冷却中，生成新链接
-                    String token = generateToken();
-                    String plainBase64 = encodeActionForHash(action, recordUUID, playerUUID); // 用于哈希计算的Base64编码
-                    String encryptedData = encodeActionWithRSA(action, recordUUID, playerUUID); // RSA加密的数据
-                    String hash = generateHash(plainBase64, token);
+            // 获取剩余冷却时间并显示给玩家
+            int remainingSeconds = cooldownManager.getRemainingCooldown(playerUUID, action);
+            String cooldownMsg = plugin.getConfig().getString("messages.error.cooldown", "操作太频繁，请等待 {cooldown} 秒后再试");
+            result.setErrorMessage(cooldownMsg.replace("{cooldown}", String.valueOf(remainingSeconds)));
+            return CompletableFuture.completedFuture(result);
+        }
 
-                    // 写入数据库
-                    return authRecordManager.writeAuthRecordAsync(playerUUID, action, token, recordUUID)
-                            .thenApply(success -> {
-                                AuthLinkResult result = new AuthLinkResult();
-                                result.setSuccess(success);
+        // 不在冷却中，生成新链接
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // 先生成记录UUID
+                String recordUUID = UUID.randomUUID().toString();
+                String token = generateToken();
+                String plainBase64 = encodeActionForHash(action, recordUUID, playerUUID); // 用于哈希计算的Base64编码
+                String encryptedData = encodeActionWithRSA(action, recordUUID, playerUUID); // RSA加密的数据
+                String hash = generateHash(plainBase64, token);
 
-                                if (success) {
-                                    result.setData(encryptedData);
-                                    result.setToken(token);
-                                    result.setHash(hash);
-                                    result.setRecordUUID(recordUUID);
+                AuthLinkResult result = new AuthLinkResult();
 
-                                    // 替换链接中的变量（不包含token，token在服务器端查询）
-                                    String link = endpoint.replace("{data}", encryptedData)
-                                            .replace("{hash}", hash);
-                                    result.setLink(link);
-                                } else {
-                                    String dbErrorMsg = plugin.getConfig().getString("messages.error.database_error", "生成链接时出错: 数据库写入失败");
-                                    result.setErrorMessage(dbErrorMsg);
-                                }
+                // 写入数据库
+                boolean success = authRecordManager.writeAuthRecordAsync(playerUUID, action, token, recordUUID).join();
 
-                                return result;
-                            });
-                })
-                .exceptionally(ex -> {
-                    plugin.getLogger().log(Level.SEVERE, "生成认证链接时出错", ex);
-                    AuthLinkResult result = new AuthLinkResult();
+                if (success) {
+                    // 数据库写入成功后，记录冷却时间
+                    cooldownManager.recordAction(playerUUID, action);
+
+                    result.setSuccess(true);
+                    result.setData(encryptedData);
+                    result.setToken(token);
+                    result.setHash(hash);
+                    result.setRecordUUID(recordUUID);
+
+                    // 替换链接中的变量（不包含token，token在服务器端查询）
+                    String link = endpoint.replace("{data}", encryptedData)
+                            .replace("{hash}", hash);
+                    result.setLink(link);
+                } else {
                     result.setSuccess(false);
-                    String generalErrorMsg = plugin.getConfig().getString("messages.error.general_error", "生成链接时出错: {error}");
-                    result.setErrorMessage(generalErrorMsg.replace("{error}", ex.getMessage()));
-                    return result;
-                });
+                    String dbErrorMsg = plugin.getConfig().getString("messages.error.database_error", "生成链接时出错: 数据库写入失败");
+                    result.setErrorMessage(dbErrorMsg);
+                }
+
+                return result;
+            } catch (Exception ex) {
+                plugin.getLogger().log(Level.SEVERE, "生成认证链接时出错", ex);
+                AuthLinkResult result = new AuthLinkResult();
+                result.setSuccess(false);
+                String generalErrorMsg = plugin.getConfig().getString("messages.error.general_error", "生成链接时出错: {error}");
+                result.setErrorMessage(generalErrorMsg.replace("{error}", ex.getMessage()));
+                return result;
+            }
+        });
     }
 
     /**
