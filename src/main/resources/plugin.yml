@@ -1,5 +1,5 @@
 name: AuthLinker
-version: 0.1.4
+version: ${project.version}
 main: com.miaomc.authLinker.AuthLinker
 api-version: 1.19
 author: MiaoMC
