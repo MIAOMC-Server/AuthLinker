@@ -1,21 +1,70 @@
+# AuthLinker 插件配置文件
+
+# 数据库设置
 database:
-  host: localhost # 数据库主机地址
-  port: 3306 # 数据库端口
-  name: authlinker # 数据库名称
-  username: root # 数据库用户名
-  password: your_password # 数据库密码
-  tableName: authlinker # 创建的数据表的名称
+  table_name: "auth_records"
+  mysql:
+    host: "localhost"
+    port: 3306
+    database: "authlinker"
+    username: "root"
+    password: "password"
+    ssl: false
 
+# 插件设置
 settings:
-  prefix: §f[§aAuth§6Linker§f] §r # 消息前缀
-  endpoint: "https://example.com/verify?data={data}&hash={hash}"
-  expired_time: 300  # 秒
-  token_length: 12 # 随机Token生成长度
-  salt: "abc123"  # 用于加密hash时增加安全性
-  cooldown: 120 # 秒，冷却时间
-  timeout: 3000 # 毫秒，超时时间
-  base64_shift: 3  # Base64位移位数
-  base64_obfuscation_table: "jQNHxo9a1zVG8dFcyb27XmiwOl0WULnkPsBKqEAZYfer3t5RMDSCJhgvu4pT-." # 混淆表，不可以出现空格和特殊字符
-  rotation_timestamp: 86400 # 时间戳旋转间隔，单位为秒
-  console_logging: false # 是否在控制台输出提示信息，true 输出信息
+  # 盐值，用于哈希计算
+  salt: "your_custom_salt_here_change_this"
+  # 生成的token长度
+  token_length: 12
+  # 验证端点URL模板
+  endpoint: "https://example.com/verify?data={data}&token={token}&hash={hash}"
+  # 冷却时间（秒）
+  cooldown: 120
+  # 链接过期时间（秒）
+  expired_time: 300
+  # 消息前缀（支持MiniMessage格式）
+  prefix: "<white>[<gradient:#00ff00:#ffff00>Auth<gradient:#ffff00:#ff6600>Linker</gradient></gradient>]</white> "
 
+# 消息配置（支持MiniMessage格式，包括渐变、颜色、样式等）
+messages:
+  # 错误消息
+  error:
+    no_permission: "<red>你没有权限使用此命令。</red>"
+    player_only: "<red>此命令只能由玩家执行。</red>"
+    invalid_action: "<red>无效的操作类型。支持的操作：<yellow>login, suffix</yellow></red>"
+    cooldown: "<red>操作太频繁，请等待 <yellow>{cooldown}</yellow> 秒后再试</red>"
+    database_error: "<red>生成链接时出错: 数据库写入失败</red>"
+    general_error: "<red>生成链接时出错: <yellow>{error}</yellow></red>"
+    keys_not_loaded: "<red>RSA密钥未加载，请先使用 <yellow>/authlinker keygen</yellow> 生成密钥对</red>"
+
+  # 成功消息
+  success:
+    link_generated: "<gradient:#00ff00:#00ffff>认证链接生成成功！</gradient>"
+    click_to_open: "<click:open_url:'{url}'><underlined><aqua>点击打开链接</aqua></underlined></click>"
+    keygen_success: "<green>RSA密钥对生成成功！密钥文件保存在: <yellow>{path}</yellow></green>"
+    keygen_failure: "<red>密钥对生成失败，请查看控制台错误信息</red>"
+
+  # 帮助消息
+  help:
+    usage: "<yellow>用法: <white>/authlinker <子命令></white></yellow>"
+    gen_usage: "<yellow>生成认证链接: <white>/authlinker gen <action></white></yellow>"
+    keygen_usage: "<yellow>生成密钥对: <white>/authlinker keygen</white></yellow>"
+    reload_usage: "<yellow>重载配置: <white>/authlinker reload</white></yellow>"
+    info_usage: "<yellow>查看信息: <white>/authlinker info</white></yellow>"
+    available_actions: "<yellow>可用操作: <gradient:#ff6600:#ffff00>login</gradient>, <gradient:#ff6600:#ffff00>suffix</gradient></yellow>"
+
+  # 信息消息
+  info:
+    plugin_info: "<gradient:#00ff00:#00ffff>AuthLinker 插件信息</gradient>"
+    version: "<yellow>版本: <white>{version}</white></yellow>"
+    rsa_status: "<yellow>RSA密钥状态: <white>{status}</white></yellow>"
+    database_type: "<yellow>数据库类型: <white>MySQL</white></yellow>"
+    table_name: "<yellow>数据表名: <white>{table_name}</white></yellow>"
+    keys_loaded: "<green>已加载</green>"
+    keys_not_loaded: "<red>未加载</red>"
+
+  # 重载消息
+  reload:
+    success: "<green>配置文件重载成功！</green>"
+    failure: "<red>配置文件重载失败: <yellow>{error}</yellow></red>"

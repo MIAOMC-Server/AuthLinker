@@ -4,7 +4,6 @@ import com.miaomc.authLinker.AuthLinker;
 import org.bukkit.configuration.file.FileConfiguration;
 
 import java.sql.*;
-import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
@@ -12,15 +11,15 @@ import java.util.logging.Level;
 public class AuthRecordManager {
     private final AuthLinker plugin;
     private final DatabaseManager databaseManager;
-    private final String tableName;
+    private final DatabaseInitializer databaseInitializer;
     private final int expiredTime;
     private final int cooldownTime;
 
-    public AuthRecordManager(AuthLinker plugin, DatabaseManager databaseManager) {
+    public AuthRecordManager(AuthLinker plugin, DatabaseManager databaseManager, DatabaseInitializer databaseInitializer) {
         this.plugin = plugin;
         this.databaseManager = databaseManager;
+        this.databaseInitializer = databaseInitializer;
         FileConfiguration config = plugin.getConfig();
-        this.tableName = config.getString("database.tableName");
         this.expiredTime = config.getInt("settings.expired_time");
         this.cooldownTime = config.getInt("settings.cooldown");
     }
@@ -51,17 +50,24 @@ public class AuthRecordManager {
      */
     public CompletableFuture<Boolean> writeAuthRecordAsync(UUID playerUUID, String action, String token, String recordUUID) {
         return CompletableFuture.supplyAsync(() -> {
-            try {
-                // 先检查是否有未过期的相同操作记录
-                String activeLinkUUID = checkActiveLink(playerUUID, action);
-                if (activeLinkUUID != null) {
-                    // 如果存在有效记录，将其标记为已覆盖
-                    markRecordAsCovered(activeLinkUUID);
-                }
+            String sql = "INSERT INTO `" + databaseInitializer.getTableName() +
+                        "` (uuid, player_uuid, action, token, expires_at) VALUES (?, ?, ?, ?, ?)";
 
-                // 写入新记录
-                writeAuthRecord(recordUUID, playerUUID.toString(), action, token);
-                return true;
+            try (Connection connection = databaseManager.getConnection();
+                 PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+
+                // 计算过期时间
+                Timestamp expiresAt = new Timestamp(System.currentTimeMillis() + (expiredTime * 1000L));
+
+                preparedStatement.setString(1, recordUUID);
+                preparedStatement.setString(2, playerUUID.toString());
+                preparedStatement.setString(3, action);
+                preparedStatement.setString(4, token);
+                preparedStatement.setTimestamp(5, expiresAt);
+
+                int rowsAffected = preparedStatement.executeUpdate();
+                return rowsAffected > 0;
+
             } catch (SQLException e) {
                 plugin.getLogger().log(Level.SEVERE, "写入认证记录失败", e);
                 return false;
@@ -70,135 +76,118 @@ public class AuthRecordManager {
     }
 
     /**
-     * 检查玩家是否有活跃的认证链接并在冷却中
+     * 异步检查玩家是否在冷却期内
      *
      * @param playerUUID 玩家UUID
      * @param action     操作类型
-     * @return 如果在冷却中返回true，否则返回false
+     * @return CompletableFuture 包含是否在冷却期内
      */
     public CompletableFuture<Boolean> isInCooldownAsync(UUID playerUUID, String action) {
         return CompletableFuture.supplyAsync(() -> {
-            try (Connection connection = databaseManager.getConnection()) {
-                long cooldownThreshold = Instant.now().getEpochSecond() - cooldownTime;
-                String sql = "SELECT uuid FROM " + tableName +
-                        " WHERE player_uuid = ? AND action = ? AND " +
-                        "UNIX_TIMESTAMP(create_at) > ? AND " +
-                        "(is_used = FALSE AND status != 'covered')";
+            String sql = "SELECT COUNT(*) FROM `" + databaseInitializer.getTableName() +
+                        "` WHERE player_uuid = ? AND action = ? AND create_at > ?";
 
-                try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                    statement.setString(1, playerUUID.toString());
-                    statement.setString(2, action);
-                    statement.setLong(3, cooldownThreshold);
+            try (Connection connection = databaseManager.getConnection();
+                 PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
 
-                    try (ResultSet resultSet = statement.executeQuery()) {
-                        return resultSet.next(); // 如果有结果则在冷却中
+                // 计算冷却时间的起始点
+                Timestamp cooldownStart = new Timestamp(System.currentTimeMillis() - (cooldownTime * 1000L));
+
+                preparedStatement.setString(1, playerUUID.toString());
+                preparedStatement.setString(2, action);
+                preparedStatement.setTimestamp(3, cooldownStart);
+
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                    if (resultSet.next()) {
+                        return resultSet.getInt(1) > 0;
                     }
                 }
+
             } catch (SQLException e) {
                 plugin.getLogger().log(Level.SEVERE, "检查冷却时间失败", e);
+            }
+
+            return false;
+        });
+    }
+
+    /**
+     * 异步标记记录为已使用
+     *
+     * @param uuid 记录UUID
+     * @return CompletableFuture 包含操作是否成功
+     */
+    public CompletableFuture<Boolean> markAsUsedAsync(String uuid) {
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = "UPDATE `" + databaseInitializer.getTableName() +
+                        "` SET is_used = TRUE, status = 'used', update_at = CURRENT_TIMESTAMP WHERE uuid = ?";
+
+            try (Connection connection = databaseManager.getConnection();
+                 PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+
+                preparedStatement.setString(1, uuid);
+                int rowsAffected = preparedStatement.executeUpdate();
+                return rowsAffected > 0;
+
+            } catch (SQLException e) {
+                plugin.getLogger().log(Level.SEVERE, "标记记录为已使用失败", e);
                 return false;
             }
         });
     }
 
     /**
-     * 获取玩家有效的认证记录UUID
-     *
-     * @param playerUUID 玩家UUID
-     * @param action     操作类型
-     * @return 有效记录的UUID，如果不存在则返回null
+     * 异步清理过期记录
      */
-    private String checkActiveLink(UUID playerUUID, String action) throws SQLException {
-        try (Connection connection = databaseManager.getConnection()) {
-            long currentTime = Instant.now().getEpochSecond();
-            String sql = "SELECT uuid FROM " + tableName +
-                    " WHERE player_uuid = ? AND action = ? AND " +
-                    "UNIX_TIMESTAMP(expires_at) > ? AND " +
-                    "is_used = FALSE";
-
-            try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setString(1, playerUUID.toString());
-                statement.setString(2, action);
-                statement.setLong(3, currentTime);
-
-                try (ResultSet resultSet = statement.executeQuery()) {
-                    if (resultSet.next()) {
-                        return resultSet.getString("uuid");
-                    }
-                    return null;
-                }
-            }
-        }
-    }
-
-    /**
-     * 将记录标记为已覆盖
-     *
-     * @param uuid 记录UUID
-     * @throws SQLException 数据库异常
-     */
-    private void markRecordAsCovered(String uuid) throws SQLException {
-        try (Connection connection = databaseManager.getConnection()) {
-            String sql = "UPDATE " + tableName +
-                    " SET is_used = TRUE, status = 'covered', expires_at = CURRENT_TIMESTAMP, update_at = CURRENT_TIMESTAMP " +
-                    "WHERE uuid = ?";
-
-            try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setString(1, uuid);
-                statement.executeUpdate();
-            }
-        }
-    }
-
-    /**
-     * 写入新的认证记录
-     *
-     * @param uuid       记录UUID
-     * @param playerUUID 玩家UUID
-     * @param action     操作类型
-     * @param token      令牌
-     * @throws SQLException 数据库异常
-     */
-    private void writeAuthRecord(String uuid, String playerUUID, String action, String token) throws SQLException {
-        try (Connection connection = databaseManager.getConnection()) {
-            String sql = "INSERT INTO " + tableName +
-                    " (uuid, player_uuid, action, token, expires_at) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? SECOND))";
-
-            try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setString(1, uuid);
-                statement.setString(2, playerUUID);
-                statement.setString(3, action);
-                statement.setString(4, token);
-
-                // 使用数据库函数直接计算过期时间，避免时区问题
-                statement.setInt(5, expiredTime);
-
-                statement.executeUpdate();
-            }
-        }
-    }
-
-    /**
-     * 将记录标记为已使用
-     *
-     * @param uuid 记录UUID
-     * @param status 状态描述
-     */
-    public CompletableFuture<Boolean> markRecordAsUsedAsync(String uuid, String status) {
+    public CompletableFuture<Integer> cleanupExpiredRecordsAsync() {
         return CompletableFuture.supplyAsync(() -> {
-            try (Connection connection = databaseManager.getConnection()) {
-                String sql = "UPDATE " + tableName + " SET is_used = TRUE, status = ? WHERE uuid = ?";
+            String sql = "DELETE FROM `" + databaseInitializer.getTableName() + "` WHERE expires_at < CURRENT_TIMESTAMP";
 
-                try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                    statement.setString(1, status);
-                    statement.setString(2, uuid);
-                    int rowsAffected = statement.executeUpdate();
-                    return rowsAffected > 0;
+            try (Connection connection = databaseManager.getConnection();
+                 PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+
+                int deletedRows = preparedStatement.executeUpdate();
+                if (deletedRows > 0) {
+                    plugin.getLogger().info("清理了 " + deletedRows + " 条过期记录");
                 }
+                return deletedRows;
+
             } catch (SQLException e) {
-                plugin.getLogger().log(Level.SEVERE, "标记记录为已使用失败", e);
-                return false;
+                plugin.getLogger().log(Level.SEVERE, "清理过期记录失败", e);
+                return 0;
             }
+        });
+    }
+
+    /**
+     * 异步验证记录是否有效
+     *
+     * @param uuid  记录UUID
+     * @param token 令牌
+     * @return CompletableFuture 包含记录是否有效
+     */
+    public CompletableFuture<Boolean> isRecordValidAsync(String uuid, String token) {
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = "SELECT COUNT(*) FROM `" + databaseInitializer.getTableName() +
+                        "` WHERE uuid = ? AND token = ? AND is_used = FALSE AND expires_at > CURRENT_TIMESTAMP";
+
+            try (Connection connection = databaseManager.getConnection();
+                 PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+
+                preparedStatement.setString(1, uuid);
+                preparedStatement.setString(2, token);
+
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                    if (resultSet.next()) {
+                        return resultSet.getInt(1) > 0;
+                    }
+                }
+
+            } catch (SQLException e) {
+                plugin.getLogger().log(Level.SEVERE, "验证记录失败", e);
+            }
+
+            return false;
         });
     }
 }

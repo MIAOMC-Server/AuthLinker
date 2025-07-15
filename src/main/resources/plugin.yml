@@ -1,28 +1,27 @@
 name: AuthLinker
-version: ${project.version}
+version: 0.1.4
 main: com.miaomc.authLinker.AuthLinker
-api-version: '1.16'
-authors: [ KumaKorin ]
-description: A Minecraft plugin for linking accounts with external services.
-website: https://korin.im
+api-version: 1.19
+author: MiaoMC
+description: 安全的Minecraft认证链接生成器，使用RSA加密保护数据传输
+website: https://github.com/miaomc/AuthLinker
 
 commands:
   authlinker:
-    description: AuthLinker 主命令
-    usage: /authlinker gen <action>
-    aliases: [ authlink ]
-    permission: miaomc.authlinker.use
-  al:
-    description: AuthLinker 命令简写
-    usage: /al gen <action>
+    description: AuthLinker主命令
+    usage: /authlinker <子命令>
+    aliases: [al]
     permission: miaomc.authlinker.use
 
 permissions:
-  miaomc.authlinker.use:
-    description: 允许使用基本AuthLinker功能
-    default: true
-  miaomc.authlinker.admin:
-    description: 允许使用AuthLinker管理功能
-    default: op
+  miaomc.authlinker.*:
+    description: AuthLinker所有权限
     children:
       miaomc.authlinker.use: true
+      miaomc.authlinker.admin: true
+  miaomc.authlinker.use:
+    description: 允许使用认证链接生成功能
+    default: true
+  miaomc.authlinker.admin:
+    description: 允许管理AuthLinker插件（生成密钥、重载配置等）
+    default: op
