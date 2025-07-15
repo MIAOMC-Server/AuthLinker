@@ -1,182 +1,208 @@
 const express = require('express');
-const crypto = require('crypto');
-const NodeRSA = require('node-rsa');
-const fs = require('fs');
-const path = require('path');
+const AuthLinkerValidator = require('./utils/AuthLinkerValidator');
+const MySQLDatabase = require('./utils/MySQLDatabase');
 
 const app = express();
 const PORT = 3000;
 
 // 配置 - 必须与插件配置保持一致
 const CONFIG = {
-    salt: 'your_custom_salt_here_change_this', // 必须与插件中的配置一致
+    salt: 'abc123', // 必须与插件中的配置一致
     privateKeyPath: './keys/private.key', // RSA私钥文件路径
+
+    // MySQL数据库配置 - 必须与插件配置保持一致
+    database: {
+        host: 'localhost',
+        port: 3306,
+        user: 'root',
+        password: 'your_password_here',
+        database: 'authlinker',
+        tableName: 'auth_records' // 与插件配置的表名一致
+    }
 };
 
-let privateKey = null;
+// 初始化验证器
+let validator;
+try {
+    validator = new AuthLinkerValidator(CONFIG);
+} catch (error) {
+    console.error('验证器初始化失败:', error.message);
+    process.exit(1);
+}
+
+// 初始化MySQL数据库连接
+let database;
+try {
+    database = new MySQLDatabase(CONFIG.database);
+} catch (error) {
+    console.error('数据库初始化失败:', error.message);
+    process.exit(1);
+}
 
 // 中间件
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/**
- * 初始化RSA私钥
- */
-function initializeRSA() {
-    try {
-        const keyPath = path.resolve(CONFIG.privateKeyPath);
+// 验证端点（使用真实MySQL数据库）
+app.get('/verify', async (req, res) => {
+    const { data, hash } = req.query;
 
-        if (!fs.existsSync(keyPath)) {
-            console.error(`私钥文件不存在: ${keyPath}`);
-            console.error('请从插件的 plugins/AuthLinker/keys/private.key 复制私钥文件');
-            return false;
-        }
-
-        // 读取Base64编码的私钥
-        const keyData = fs.readFileSync(keyPath, 'utf8');
-        const keyBuffer = Buffer.from(keyData, 'base64');
-
-        // 创建RSA实例
-        privateKey = new NodeRSA();
-        privateKey.importKey(keyBuffer, 'pkcs8-private-der');
-
-        console.log('RSA私钥加载成功');
-        return true;
-    } catch (error) {
-        console.error('RSA私钥加载失败:', error.message);
-        return false;
-    }
-}
-
-/**
- * RSA解密数据
- */
-function decryptData(encryptedData) {
-    if (!privateKey) {
-        throw new Error('RSA私钥未初始化');
-    }
-
-    try {
-        const decryptedData = privateKey.decrypt(encryptedData, 'utf8');
-        return JSON.parse(decryptedData);
-    } catch (error) {
-        throw new Error('RSA解密失败: ' + error.message);
-    }
-}
-
-/**
- * 计算哈希值（与插件逻辑保持一致）
- */
-function calculateHash(base64Data, token) {
-    const input = base64Data + token + CONFIG.salt;
-    return crypto.createHash('sha256').update(input, 'utf8').digest('hex');
-}
-
-/**
- * 从解密数据重建Base64（用于哈希验证）
- */
-function rebuildBase64ForHash(decryptedJson) {
-    const jsonString = JSON.stringify({
-        uuid: decryptedJson.uuid,
-        action: decryptedJson.action,
-        player_uuid: decryptedJson.player_uuid,
-        expires_time: decryptedJson.expires_time
-    });
-    return Buffer.from(jsonString, 'utf8').toString('base64');
-}
-
-/**
- * 验证认证请求
- */
-function verifyRequest(data, token, hash) {
-    try {
-        // 1. RSA解密
-        const decryptedData = decryptData(data);
-
-        // 2. 检查数据完整性
-        if (!decryptedData.uuid || !decryptedData.action ||
-            !decryptedData.player_uuid || !decryptedData.expires_time) {
-            return { valid: false, error: '解密数据格式不正确' };
-        }
-
-        // 3. 检查过期时间
-        const currentTime = Date.now();
-        if (currentTime > decryptedData.expires_time) {
-            return { valid: false, error: '验证链接已过期' };
-        }
-
-        // 4. 重建Base64并验证哈希
-        const base64Data = rebuildBase64ForHash(decryptedData);
-        const expectedHash = calculateHash(base64Data, token);
-
-        if (expectedHash !== hash) {
-            return { valid: false, error: '哈希验证失败' };
-        }
-
-        return { valid: true, decryptedData };
-
-    } catch (error) {
-        return { valid: false, error: error.message };
-    }
-}
-
-// 验证端点
-app.get('/verify', (req, res) => {
-    const { data, token, hash } = req.query;
-
-    if (!data || !token || !hash) {
+    if (!data || !hash) {
         return res.status(400).json({
             success: false,
-            error: '缺少必要参数'
+            error: '缺少必要参数: data, hash'
         });
     }
 
-    const result = verifyRequest(data, token, hash);
+    try {
+        // 使用MySQL数据库进行验证
+        const result = await validator.verifyRequest(data, hash, database);
 
-    if (!result.valid) {
-        return res.status(400).json({
-            success: false,
-            error: result.error
-        });
-    }
-
-    // 根据操作类型处理
-    const { decryptedData } = result;
-    let message = '';
-
-    switch (decryptedData.action) {
-        case 'login':
-            message = '登录验证成功';
-            break;
-        case 'suffix':
-            message = '后缀设置验证成功';
-            break;
-        default:
+        if (!result.valid) {
             return res.status(400).json({
                 success: false,
-                error: '不支持的操作类型'
+                error: result.error
             });
-    }
-
-    res.json({
-        success: true,
-        message: message,
-        data: {
-            action: decryptedData.action,
-            player_uuid: decryptedData.player_uuid,
-            timestamp: new Date().toISOString()
         }
-    });
+
+        const { decryptedData, dbRecord } = result;
+
+        // 标记记录为已使用（更新MySQL数据库）
+        const marked = await database.markAsUsed(decryptedData.uuid);
+        if (!marked) {
+            console.warn(`无法标记记录 ${decryptedData.uuid} 为已使用`);
+        }
+
+        // 根据操作类型处理
+        let message = '';
+        switch (decryptedData.action) {
+            case 'login':
+                message = '登录验证成功';
+                break;
+            case 'suffix':
+                message = '后缀设置验证成功';
+                break;
+            default:
+                return res.status(400).json({
+                    success: false,
+                    error: '不支持的操作类型: ' + decryptedData.action
+                });
+        }
+
+        res.json({
+            success: true,
+            message: message,
+            data: {
+                action: decryptedData.action,
+                player_uuid: decryptedData.player_uuid,
+                record_uuid: decryptedData.uuid,
+                timestamp: new Date().toISOString()
+            }
+        });
+
+    } catch (error) {
+        console.error('验证过程出错:', error);
+        res.status(500).json({
+            success: false,
+            error: '服务器内部错误'
+        });
+    }
+});
+
+// 查询玩家记录端点（调试用）
+app.get('/debug/player/:playerUuid', async (req, res) => {
+    const { playerUuid } = req.params;
+    const { action } = req.query;
+
+    try {
+        const records = await database.getRecordsByPlayer(playerUuid, action);
+        res.json({
+            success: true,
+            data: {
+                player_uuid: playerUuid,
+                records: records
+            }
+        });
+    } catch (error) {
+        console.error('查询玩家记录失败:', error);
+        res.status(500).json({
+            success: false,
+            error: '查询失败'
+        });
+    }
+});
+
+// 清理过期记录端点
+app.post('/admin/cleanup', async (req, res) => {
+    try {
+        const deletedCount = await database.cleanupExpiredRecords();
+        res.json({
+            success: true,
+            message: `清理了 ${deletedCount} 条过期记录`
+        });
+    } catch (error) {
+        console.error('清理过期记录失败:', error);
+        res.status(500).json({
+            success: false,
+            error: '清理失败'
+        });
+    }
+});
+
+// 健康检查端点（包含数据库连接状态）
+app.get('/health', async (req, res) => {
+    try {
+        const dbConnected = await database.testConnection();
+        res.json({
+            success: true,
+            status: 'running',
+            rsa_loaded: validator.isKeysLoaded(),
+            database_connected: dbConnected,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            status: 'error',
+            rsa_loaded: validator.isKeysLoaded(),
+            database_connected: false,
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// 优雅关闭处理
+process.on('SIGINT', async () => {
+    console.log('正在关闭服务器...');
+    await database.close();
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    console.log('正在关闭服务器...');
+    await database.close();
+    process.exit(0);
 });
 
 // 启动服务器
-if (initializeRSA()) {
-    app.listen(PORT, () => {
-        console.log(`AuthLinker 验证服务器运行在端口 ${PORT}`);
-        console.log(`验证端点: http://localhost:${PORT}/verify`);
-        console.log('配置说明：请确保盐值与插件配置一致');
-    });
-} else {
-    console.error('服务器启动失败：RSA初始化失败');
-    process.exit(1);
-}
+app.listen(PORT, async () => {
+    console.log(`AuthLinker 验证服务器运行在端口 ${PORT}`);
+    console.log(`验证端点: http://localhost:${PORT}/verify`);
+    console.log(`健康检查: http://localhost:${PORT}/health`);
+    console.log(`调试端点: http://localhost:${PORT}/debug/player/{playerUuid}`);
+    console.log('');
+
+    // 测试数据库连接
+    const dbConnected = await database.testConnection();
+    if (!dbConnected) {
+        console.error('⚠️  数据库连接失败，请检查配置');
+    }
+
+    console.log('配置提醒:');
+    console.log('1. 确保已从插件复制私钥文件到 ./keys/private.key');
+    console.log('2. 确保 salt 配置与插件中的配置一致');
+    console.log('3. 确保 MySQL 数据库配置正确并可连接');
+    console.log('4. 确保表名与插件配置一致');
+    console.log('5. Token现在通过MySQL数据库查询获取（更安全）');
+});

@@ -84,22 +84,25 @@ public class AuthRecordManager {
      */
     public CompletableFuture<Boolean> isInCooldownAsync(UUID playerUUID, String action) {
         return CompletableFuture.supplyAsync(() -> {
-            String sql = "SELECT COUNT(*) FROM `" + databaseInitializer.getTableName() +
-                        "` WHERE player_uuid = ? AND action = ? AND create_at > ?";
+            // 修复冷却时间逻辑：查询最近一条记录的创建时间
+            String sql = "SELECT create_at FROM `" + databaseInitializer.getTableName() +
+                        "` WHERE player_uuid = ? AND action = ? ORDER BY create_at DESC LIMIT 1";
 
             try (Connection connection = databaseManager.getConnection();
                  PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
 
-                // 计算冷却时间的起始点
-                Timestamp cooldownStart = new Timestamp(System.currentTimeMillis() - (cooldownTime * 1000L));
-
                 preparedStatement.setString(1, playerUUID.toString());
                 preparedStatement.setString(2, action);
-                preparedStatement.setTimestamp(3, cooldownStart);
 
                 try (ResultSet resultSet = preparedStatement.executeQuery()) {
                     if (resultSet.next()) {
-                        return resultSet.getInt(1) > 0;
+                        Timestamp lastCreateTime = resultSet.getTimestamp("create_at");
+                        long currentTime = System.currentTimeMillis();
+                        long lastCreateTimeMillis = lastCreateTime.getTime();
+                        long timeDifference = currentTime - lastCreateTimeMillis;
+
+                        // 如果时间差小于冷却时间（毫秒），则还在冷却期内
+                        return timeDifference < (cooldownTime * 1000L);
                     }
                 }
 
@@ -107,6 +110,7 @@ public class AuthRecordManager {
                 plugin.getLogger().log(Level.SEVERE, "检查冷却时间失败", e);
             }
 
+            // 如果没有找到记录，说明没有冷却限制
             return false;
         });
     }

@@ -14,11 +14,11 @@ database:
 # 插件设置
 settings:
   # 盐值，用于哈希计算
-  salt: "your_custom_salt_here_change_this"
+  salt: "abc123"
   # 生成的token长度
   token_length: 12
-  # 验证端点URL模板
-  endpoint: "https://example.com/verify?data={data}&token={token}&hash={hash}"
+  # 验证端点URL模板（token在服务器端从数据库查询，不在URL中传递）
+  endpoint: "https://example.com/verify?data={data}&hash={hash}"
   # 冷却时间（秒）
   cooldown: 120
   # 链接过期时间（秒）

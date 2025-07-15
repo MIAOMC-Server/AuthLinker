@@ -93,10 +93,9 @@ public class AuthLinkGenerator {
                                     result.setHash(hash);
                                     result.setRecordUUID(recordUUID);
 
-                                    // 替换链接中的所有变量，包括token
+                                    // 替换链接中的变量（不包含token，token在服务器端查询）
                                     String link = endpoint.replace("{data}", encryptedData)
-                                            .replace("{hash}", hash)
-                                            .replace("{token}", token);
+                                            .replace("{hash}", hash);
                                     result.setLink(link);
                                 } else {
                                     String dbErrorMsg = plugin.getConfig().getString("messages.error.database_error", "生成链接时出错: 数据库写入失败");
